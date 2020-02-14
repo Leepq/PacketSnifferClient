@@ -13,8 +13,8 @@ extern "C"
 {
 #include "user_interface.h"
 }
-String TARGET = "";
-int chl;
+String TARGET = "00:00:00:00:00:00";
+int chl = 11;
 #define TARGETMODE true
 //"XX:XX:XX:00:0a:XX"
 // According to the SDK documentation, the packet type can be inferred from the
@@ -130,49 +130,50 @@ bool running = false;
 void setup()
 {
   Serial.begin(115200);
-  Serial.println("\nType \"start\" to run the script ");
-  
-  while (!running) {
-    if (Serial.readStringUntil('\n').equals("start")) {
-      running = true;
-    }
-  }
-  Serial.print("Insert MAC Adress: ");
-  while (TARGET.length() == 0) {
-    TARGET = Serial.readStringUntil('\n');
-  }
-  
-  Serial.println(TARGET);
-  Serial.print("Insert Channel: ");
-  
-  while (chl == 0) {
-    chl = Serial.readStringUntil('\n').toInt();
-  }
-  
-  Serial.println(chl);
-  
-  if (running) {
-    // Serial setup
+  // Serial setup
 
-    Serial.println("Staring Sniffer");
-    delay(10);
-    wifi_set_channel(chl);
+  Serial.println("Staring Sniffer");
+  delay(10);
+  wifi_set_channel(chl);
 
-    // Wifi setup
-    wifi_set_opmode(STATION_MODE);
-    wifi_promiscuous_enable(0);
-    WiFi.disconnect();
+  // Wifi setup
+  wifi_set_opmode(STATION_MODE);
+  wifi_promiscuous_enable(0);
+  WiFi.disconnect();
 
-    // Set sniffer callback
-    wifi_set_promiscuous_rx_cb(wifi_sniffer_packet_handler);
-    wifi_promiscuous_enable(1);
+  // Set sniffer callback
+  wifi_set_promiscuous_rx_cb(wifi_sniffer_packet_handler);
+  wifi_promiscuous_enable(1);
 
-    // Print header
-    //Serial.printf("\n\n     MAC Address 1|      MAC Address 2|      MAC Address 3| Ch| RSSI| Pr| T(S)  |           Frame type         |TDS|FDS| MF|RTR|PWR| MD|ENC|STR|   SSID");
-  }
+  // Print header
+  //Serial.printf("\n\n     MAC Address 1|      MAC Address 2|      MAC Address 3| Ch| RSSI| Pr| T(S)  |           Frame type         |TDS|FDS| MF|RTR|PWR| MD|ENC|STR|   SSID");
+
 }
 
 void loop()
 {
+  if (Serial.available() > 0) {
+    String newValue = Serial.readStringUntil('\n');
+    if (newValue.length() > 2) {
+      if (!TARGET.equals(newValue)) {
+        TARGET = newValue;
+        Serial.println("\n New MAC: " + TARGET);
+        wifi_promiscuous_enable(0);
+        wifi_set_promiscuous_rx_cb(wifi_sniffer_packet_handler);
+        wifi_promiscuous_enable(1);
+      }
+    }
+    else {
+      chl = newValue.toInt();
+      Serial.println("\n New Channel: "+ (String)chl);
+      wifi_promiscuous_enable(0);
+      wifi_set_channel(chl);
+      wifi_set_opmode(STATION_MODE);
+      wifi_set_promiscuous_rx_cb(wifi_sniffer_packet_handler);
+      wifi_promiscuous_enable(1);
+
+    }
+  }
   delay(10);
+
 }

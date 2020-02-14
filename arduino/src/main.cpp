@@ -11,9 +11,10 @@
 
 extern "C"
 {
-  #include "user_interface.h"
+#include "user_interface.h"
 }
-#define TARGET "00:0a:f5:d0:3f:18"
+String TARGET = "";
+int chl;
 #define TARGETMODE true
 //"XX:XX:XX:00:0a:XX"
 // According to the SDK documentation, the packet type can be inferred from the
@@ -21,24 +22,24 @@ extern "C"
 // from the packet header itself. Still, this is here for reference.
 wifi_promiscuous_pkt_type_t packet_type_parser(uint16_t len)
 {
-  	switch(len)
-    {
-      // If only rx_ctrl is returned, this is an unsupported packet
-      case sizeof(wifi_pkt_rx_ctrl_t):
+  switch (len)
+  {
+    // If only rx_ctrl is returned, this is an unsupported packet
+    case sizeof(wifi_pkt_rx_ctrl_t):
       return WIFI_PKT_MISC;
 
-      // Management packet
-      case sizeof(wifi_pkt_mgmt_t):
+    // Management packet
+    case sizeof(wifi_pkt_mgmt_t):
       return WIFI_PKT_MGMT;
 
-      // Data packet
-      default:
+    // Data packet
+    default:
       return WIFI_PKT_DATA;
-    }
+  }
 }
 
-boolean isTarget(String s,String t,String u){
-  if(s.equals(TARGET)||t.equals(TARGET)|u.equals(TARGET))return true;
+boolean isTarget(String s, String t, String u) {
+  if (s.equals(TARGET) || t.equals(TARGET) | u.equals(TARGET))return true;
   return false;
 }
 
@@ -65,25 +66,25 @@ void wifi_sniffer_packet_handler(uint8_t *buff, uint16_t len)
   mac2str(hdr->addr1, addr1);
   mac2str(hdr->addr2, addr2);
   mac2str(hdr->addr3, addr3);
-  if(TARGETMODE){
-      if(isTarget(addr1,addr2,addr3)){
-              Serial.printf("\nB %02d , %-28s E",
-          ppkt->rx_ctrl.rssi,
-          wifi_pkt_type2str((wifi_promiscuous_pkt_type_t)frame_ctrl->type, (wifi_mgmt_subtypes_t)frame_ctrl->subtype)
-      );
-        return;
-      }
+  if (TARGETMODE) {
+    if (isTarget(addr1, addr2, addr3)) {
+      Serial.printf("\nB %02d , %-28s E",
+                    ppkt->rx_ctrl.rssi,
+                    wifi_pkt_type2str((wifi_promiscuous_pkt_type_t)frame_ctrl->type, (wifi_mgmt_subtypes_t)frame_ctrl->subtype)
+                   );
+      return;
+    }
   }
-  else{
-       // Serial.println("Not target:"+String(addr2));
-         Serial.printf("\nB %s , %s , %s ,%02d , %-28s E",
-        addr1,
-        addr2,
-        addr3,
-        wifi_get_channel(),
-          ppkt->rx_ctrl.rssi,
-          wifi_pkt_type2str((wifi_promiscuous_pkt_type_t)frame_ctrl->type, (wifi_mgmt_subtypes_t)frame_ctrl->subtype)
-      );
+  else {
+    // Serial.println("Not target:"+String(addr2));
+    Serial.printf("\nB %s , %s , %s ,%02d , %-28s E",
+                  addr1,
+                  addr2,
+                  addr3,
+                  wifi_get_channel(),
+                  ppkt->rx_ctrl.rssi,
+                  wifi_pkt_type2str((wifi_promiscuous_pkt_type_t)frame_ctrl->type, (wifi_mgmt_subtypes_t)frame_ctrl->subtype)
+                 );
   }
 
   // Output info to serial
@@ -106,9 +107,9 @@ void wifi_sniffer_packet_handler(uint8_t *buff, uint16_t len)
     frame_ctrl->wep,
     frame_ctrl->strict);
 
-  // Print ESSID if beacon
-  if (frame_ctrl->type == WIFI_PKT_MGMT && frame_ctrl->subtype == BEACON)
-  {
+    // Print ESSID if beacon
+    if (frame_ctrl->type == WIFI_PKT_MGMT && frame_ctrl->subtype == BEACON)
+    {
     const wifi_mgmt_beacon_t *beacon_frame = (wifi_mgmt_beacon_t*) ipkt->payload;
     char ssid[32] = {0};
 
@@ -122,33 +123,56 @@ void wifi_sniffer_packet_handler(uint8_t *buff, uint16_t len)
     }
 
     Serial.printf("%s", ssid);
-  }*/
+    }*/
 }
-
+bool running = false;
 
 void setup()
 {
-  // Serial setup
   Serial.begin(115200);
-  Serial.println("Staring Sniffer");
-  delay(10);
-  wifi_set_channel(6);
+  Serial.println("\nType \"start\" to run the script ");
+  
+  while (!running) {
+    if (Serial.readStringUntil('\n').equals("start")) {
+      running = true;
+    }
+  }
+  Serial.print("Insert MAC Adress: ");
+  while (TARGET.length() == 0) {
+    TARGET = Serial.readStringUntil('\n');
+  }
+  
+  Serial.println(TARGET);
+  Serial.print("Insert Channel: ");
+  
+  while (chl == 0) {
+    chl = Serial.readStringUntil('\n').toInt();
+  }
+  
+  Serial.println(chl);
+  
+  if (running) {
+    // Serial setup
 
-  // Wifi setup
-  wifi_set_opmode(STATION_MODE);
-  wifi_promiscuous_enable(0);
-  WiFi.disconnect();
+    Serial.println("Staring Sniffer");
+    delay(10);
+    wifi_set_channel(chl);
 
-  // Set sniffer callback
-  wifi_set_promiscuous_rx_cb(wifi_sniffer_packet_handler);
-  wifi_promiscuous_enable(1);
+    // Wifi setup
+    wifi_set_opmode(STATION_MODE);
+    wifi_promiscuous_enable(0);
+    WiFi.disconnect();
 
-  // Print header
-  //Serial.printf("\n\n     MAC Address 1|      MAC Address 2|      MAC Address 3| Ch| RSSI| Pr| T(S)  |           Frame type         |TDS|FDS| MF|RTR|PWR| MD|ENC|STR|   SSID");
+    // Set sniffer callback
+    wifi_set_promiscuous_rx_cb(wifi_sniffer_packet_handler);
+    wifi_promiscuous_enable(1);
 
+    // Print header
+    //Serial.printf("\n\n     MAC Address 1|      MAC Address 2|      MAC Address 3| Ch| RSSI| Pr| T(S)  |           Frame type         |TDS|FDS| MF|RTR|PWR| MD|ENC|STR|   SSID");
+  }
 }
 
 void loop()
 {
- delay(10);
+  delay(10);
 }
